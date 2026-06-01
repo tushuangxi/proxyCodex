@@ -71,6 +71,12 @@ jobs:
           pattern: proxyCodex-*
           merge-multiple: true
 
+      - name: Rename artifacts for release
+        run: |
+          if [ -f "proxyCodex.exe" ]; then mv "proxyCodex.exe" "proxyCodex-windows.exe"; fi
+          if [ -f "proxyCodex" ]; then mv "proxyCodex" "proxyCodex-macos"; fi
+          ls -la
+
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         with:
