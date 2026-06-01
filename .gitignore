@@ -21,3 +21,4 @@ providers.json
 
 # Logs
 *.log
+.omc/
