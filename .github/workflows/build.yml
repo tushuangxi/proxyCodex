@@ -32,6 +32,23 @@ jobs:
       - name: Install PyInstaller
         run: pip install pyinstaller
 
+      - name: Generate default config for build
+        run: |
+          python -c "
+          import json
+          cfg = {
+            'providers': {
+              'deepseek': {'name': 'DeepSeek', 'base_url': 'https://api.deepseek.com/v1', 'models': ['deepseek-chat', 'deepseek-reasoner', 'deepseek-v4-flash', 'deepseek-v4-pro']},
+              'moonshot': {'name': 'Kimi (Moonshot)', 'base_url': 'https://api.moonshot.cn/v1', 'models': ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k']}
+            },
+            'active_provider': 'deepseek',
+            'api_key': ''
+          }
+          with open('providers.json', 'w') as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+          print('Default providers.json created')
+          "
+
       - name: Build with PyInstaller
         run: pyinstaller ${{ matrix.pyinstaller_args }} proxyCodex.py
 
