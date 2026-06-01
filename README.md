@@ -11,7 +11,7 @@ proxyCodex 是一个轻量级本地代理，将 Codex 的 Responses API 协议�
 - **零依赖代理** — 纯 Python 实现，只需 Python 3.8+，无需额外安装
 - **一键打包 EXE** — 内置 PyInstaller 打包脚本，分发无需 Python 环境
 - **自动配置 Codex** — 自动写入 config.toml 和 auth.json，无需手动编辑
-- **快速响应** — 针对国内 API 优化，首 token 延迟 < 1 秒
+- **跨平台支持** — 完美支持 Windows 和 macOS，Python 脚本全平台通用，无需修改
 
 ## 🚀 快速开始
 
@@ -46,6 +46,19 @@ python proxyCodex.py
 ### Windows 一键启动
 
 双击 `start.bat` — 自动完成：配置检查 → 启动代理 → 启动 Codex
+
+### macOS 一键启动
+
+```bash
+# 首次运行前加执行权限
+chmod +x start.sh
+
+# 启动（自动完成：配置检查 → 启动代理 → 打开 Codex 应用）
+./start.sh
+```
+
+> 💡 `start.sh` 会自动检测 `/Applications/Codex.app` 并打开，也支持 `codex` CLI 命令。
+> 如需手动停止代理：`pkill -f proxyCodex.py`
 
 ## 🖼️ 截图演示
 
@@ -148,16 +161,20 @@ pyinstaller --onefile --console \
 
 打包后的 `proxyCodex.exe` 是独立的可执行文件，可在未安装 Python 的 Windows 电脑上直接运行。
 
+macOS 用户直接运行 Python 脚本即可，无需打包。
+
 ## 🏗️ 项目结构
 
 ```
 proxyCodex/
-├── proxyCodex.py        # 主代理程序
+├── proxyCodex.py        # 主代理程序（跨平台）
 ├── providers.json       # 提供商配置（含 API Key，已 gitignore）
 ├── config.toml.template # Codex 配置模板
 ├── start.bat            # Windows 一键启动
+├── start.sh             # macOS 一键启动
 ├── switch.bat           # 提供商切换
 ├── build.bat            # EXE 打包脚本
+├── screenshots/         # 截图
 ├── requirements.txt     # Python 依赖
 ├── LICENSE              # MIT 协议
 └── README.md            # 本文件
