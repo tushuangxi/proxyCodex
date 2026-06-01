@@ -144,7 +144,9 @@ python proxyCodex.py --setup
 }
 ```
 
-## 📦 打包为 EXE
+## 📦 打包
+
+### Windows EXE
 
 ```bash
 # 安装打包工具
@@ -161,7 +163,19 @@ pyinstaller --onefile --console \
 
 打包后的 `proxyCodex.exe` 是独立的可执行文件，可在未安装 Python 的 Windows 电脑上直接运行。
 
-macOS 用户直接运行 Python 脚本即可，无需打包。
+### macOS 可执行文件
+
+macOS 版本通过 GitHub Actions 自动构建：
+
+```bash
+# 推送版本标签即可触发自动构建
+git tag v1.0.0
+git push --tags
+```
+
+构建完成后，从 [Releases](https://github.com/tushuangxi/proxyCodex/releases) 下载 `proxyCodex-macos`。
+
+> macOS 用户也可直接运行 Python 脚本：`python3 proxyCodex.py`，无需打包。
 
 ## 🏗️ 项目结构
 

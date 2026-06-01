@@ -51,4 +51,8 @@ echo 使用方法:
 echo   proxyCodex.exe          启动代理
 echo   proxyCodex.exe --setup 首次配置
 echo.
+echo macOS 用户请使用 GitHub Actions 自动构建:
+echo   推送 tag v* 即可在 Releases 页面下载 macOS 版本
+echo   或直接在终端运行: python3 proxyCodex.py
+echo.
 pause
