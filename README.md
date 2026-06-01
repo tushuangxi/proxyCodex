@@ -47,6 +47,12 @@ python proxyCodex.py
 
 双击 `start.bat` — 自动完成：配置检查 → 启动代理 → 启动 Codex
 
+## 🖼️ 截图演示
+
+| 启动代理 | Codex 对话 |
+|---------|-----------|
+| ![启动代理](screenshots/QQ20260602-021314.png) | ![Codex 对话](screenshots/QQ20260602-021339.png) |
+
 ## 📖 使用指南
 
 ### 首次配置
