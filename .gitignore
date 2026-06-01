@@ -1,0 +1,23 @@
+# Byte-compiled
+__pycache__/
+*.pyc
+*.pyo
+
+# Build
+dist/
+build/
+*.spec
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Config with keys (user should edit)
+providers.json
+
+# Logs
+*.log

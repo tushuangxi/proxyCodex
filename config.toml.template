@@ -1,0 +1,13 @@
+# Codex 配置模板 — 由 proxyCodex 自动生成
+model_provider = "custom"
+model = "deepseek-v4-flash"
+model_reasoning_effort = "medium"
+disable_response_storage = true
+model_catalog_json = 'C:\Users\Administrator\.codex\cc-switch-model-catalog.json'
+
+[model_providers]
+[model_providers.custom]
+name = "国内 API 代理"
+base_url = "http://127.0.0.1:PORT/v1"
+wire_api = "responses"
+requires_openai_auth = true
