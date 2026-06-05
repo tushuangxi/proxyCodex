@@ -117,12 +117,12 @@ def get_active_provider(config):
 
 
 # ── Codex 自动配置 ────────────────────────────────────────
-def setup_codex_config(port, provider_id, provider, api_key):
+def setup_codex_config(port, provider_id, provider, api_key, active_model=None):
     """自动配置 Codex 的 config.toml 和 auth.json"""
     os.makedirs(CODEX_CONFIG_DIR, exist_ok=True)
 
     # 写入 config.toml
-    model = provider.get("models", [None])[0]
+    model = active_model or provider.get("models", [None])[0]
     toml_content = f"""# proxyCodex 自动生成 — 请勿手动修改
 model_provider = "custom"
 model = "{model}"
@@ -183,13 +183,33 @@ def interactive_setup():
         print("API Key 不能为空")
         api_key = input(f"请输入 {provider['name']} API Key: ").strip()
 
+    # 选择模型
+    models = provider.get("models", [])
+    print()
+    print("可用模型:")
+    for i, m in enumerate(models, 1):
+        print(f"  {i}. {m}")
+    while True:
+        try:
+            choice = input(f"请选择模型 [1-{len(models)}] (默认 1): ").strip()
+            if not choice:
+                choice = "1"
+            idx = int(choice) - 1
+            if 0 <= idx < len(models):
+                break
+        except ValueError:
+            pass
+        print("输入无效，请重试")
+    selected_model = models[idx]
+
     # 保存配置
     config["active_provider"] = provider_id
     config["api_key"] = api_key
+    config["active_model"] = selected_model
     save_providers(config)
 
     # 配置 Codex
-    setup_codex_config(DEFAULT_PORT, provider_id, provider, api_key)
+    setup_codex_config(DEFAULT_PORT, provider_id, provider, api_key, active_model=selected_model)
 
     print(f"\n✅ 配置完成！当前提供商: {provider['name']}")
     print(f"   现在运行 proxyCodex 即可使用 Codex")
@@ -581,8 +601,9 @@ def main():
     ProxyHandler.model_config = build_model_config(config)
     ProxyHandler.api_key = api_key
 
-    # 自动配置 Codex（覆盖写入以确保同步）
-    setup_codex_config(args.port, provider_id, provider, api_key)
+    # 使用 providers.json 中保存的模型
+    active_model = config.get("active_model")
+    setup_codex_config(args.port, provider_id, provider, api_key, active_model=active_model)
 
     # 启动服务器
     server = ThreadedHTTPServer(("127.0.0.1", args.port), ProxyHandler)
