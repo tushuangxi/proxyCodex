@@ -7,7 +7,8 @@ proxyCodex 是一个轻量级本地代理，将 Codex 的 Responses API 协议�
 ## ✨ 特性
 
 - **即插即用** — 启动代理 → 打开 Codex → 选择"国内 API 代理"即可使用
-- **多提供商支持** — 开箱支持 DeepSeek、Kimi (Moonshot)，可轻松扩展
+- **多提供商支持** — 开箱支持 DeepSeek、Kimi (Moonshot)、GPT-4o 中转，可轻松扩展
+- **运行中切换** — 控制台直接输入命令切换提供商和模型，无需重启
 - **零依赖代理** — 纯 Python 实现，只需 Python 3.8+，无需额外安装
 - **一键打包 EXE** — 内置 PyInstaller 打包脚本，分发无需 Python 环境
 - **自动配置 Codex** — 自动写入 config.toml 和 auth.json，无需手动编辑
@@ -85,11 +86,30 @@ python proxyCodex.py --setup
 # 启动代理（默认端口 3000）
 python proxyCodex.py
 
+# 临时切换提供商
+python proxyCodex.py --provider moonshot
+
+# 临时切换模型
+python proxyCodex.py --model deepseek-reasoner
+
 # 指定端口
 python proxyCodex.py --port 8080
 
 # 查看帮助
 python proxyCodex.py --help
+```
+
+### 运行中切换（交互模式）
+
+启动后直接在控制台输入命令：
+
+```
+> switch moonshot             切换提供商
+> model deepseek-v4-flash     切换模型
+> models                      查看当前可用模型
+> config url https://xxx/v1   设置 GPT-4o 中转地址
+> help                        查看所有命令
+> exit                        退出
 ```
 
 ### 切换提供商
@@ -123,6 +143,11 @@ python proxyCodex.py --setup
       "name": "Kimi (Moonshot)",
       "base_url": "https://api.moonshot.cn/v1",
       "models": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+    },
+    "gpt4o": {
+      "name": "GPT-4o 中转",
+      "base_url": "",
+      "models": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "o3", "o4-mini"]
     }
   },
   "active_provider": "deepseek",
