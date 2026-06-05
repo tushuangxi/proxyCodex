@@ -693,10 +693,23 @@ def main():
                 elif cmd == "models":
                     for mid in ProxyHandler.model_config:
                         print(f"     {mid}")
+                elif cmd.startswith("config url "):
+                    url = cmd[11:].strip()
+                    pid = config["active_provider"]
+                    if pid in config.get("providers", {}):
+                        config["providers"][pid]["custom_base_url"] = url
+                        save_providers(config)
+                        # 重新加载模型配置
+                        provider_id, provider = get_active_provider(config)
+                        ProxyHandler.model_config = build_model_config(config)
+                        print(f"  >> GPT-4o API 地址已设置为: {url}")
+                    else:
+                        print(f"  >> 错误")
                 elif cmd == "help":
-                    print("  switch <id>  - 切换提供商")
-                    print("  model <name> - 切换模型")
-                    print("  models       - 查看可用")
+                    print("  switch <id>    - 切换提供商")
+                    print("  model <name>   - 切换模型")
+                    print("  models         - 查看可用模型")
+                    print("  config url <s> - 设置中转 API 地址")
                 elif cmd in ("exit", "quit"):
                     os._exit(0)
             except (EOFError, KeyboardInterrupt):
