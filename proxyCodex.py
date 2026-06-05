@@ -594,6 +594,7 @@ def main():
         """
     )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"监听端口 (默认: {DEFAULT_PORT})")
+    parser.add_argument("--provider", type=str, default=None, help="临时切换提供商 (deepseek / moonshot / gpt4o)")
     parser.add_argument("--model", type=str, default=None, help="临时切换模型 (如 deepseek-v4-flash)")
     parser.add_argument("--setup", action="store_true", help="首次交互式配置")
     parser.add_argument("--version", action="store_true", help="显示版本号")
@@ -606,6 +607,16 @@ def main():
 
     # 加载配置
     config = load_providers()
+
+    # --provider 临时切换
+    if args.provider:
+        if args.provider in config.get("providers", {}):
+            config["active_provider"] = args.provider
+            print(f"[proxyCodex] 临时切换提供商: {config['providers'][args.provider]['name']}")
+        else:
+            available = list(config.get("providers", {}).keys())
+            print(f"[proxyCodex] 错误: 未知提供商 '{args.provider}'，可用: {available}")
+            sys.exit(1)
 
     # --setup 模式
     if args.setup:
