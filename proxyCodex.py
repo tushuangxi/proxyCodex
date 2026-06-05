@@ -38,7 +38,7 @@ CODEX_CONFIG_DIR = os.path.expanduser("~/.codex")
 CODEX_CONFIG_FILE = os.path.join(CODEX_CONFIG_DIR, "config.toml")
 CODEX_AUTH_FILE = os.path.join(CODEX_CONFIG_DIR, "auth.json")
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 BANNER = f"""
 ╔══════════════════════════════════════════╗
 ║         proxyCodex v{VERSION}              ║
@@ -567,6 +567,7 @@ def main():
         """
     )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"监听端口 (默认: {DEFAULT_PORT})")
+    parser.add_argument("--model", type=str, default=None, help="临时切换模型 (如 deepseek-v4-flash)")
     parser.add_argument("--setup", action="store_true", help="首次交互式配置")
     parser.add_argument("--version", action="store_true", help="显示版本号")
 
@@ -601,9 +602,12 @@ def main():
     ProxyHandler.model_config = build_model_config(config)
     ProxyHandler.api_key = api_key
 
-    # 使用 providers.json 中保存的模型
-    active_model = config.get("active_model")
-    setup_codex_config(args.port, provider_id, provider, api_key, active_model=active_model)
+    # 根据 --model 或配置文件确定默认模型
+    active_model = args.model or config.get("active_model") or provider.get("models", [None])[0]
+
+    # 仅首次运行生成 config.toml（不存在时，避免覆盖用户手动修改）
+    if not os.path.exists(CODEX_CONFIG_FILE):
+        setup_codex_config(args.port, provider_id, provider, api_key, active_model=active_model)
 
     # 启动服务器
     server = ThreadedHTTPServer(("127.0.0.1", args.port), ProxyHandler)
