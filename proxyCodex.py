@@ -131,7 +131,7 @@ disable_response_storage = true
 
 [model_providers]
 [model_providers.custom]
-name = "{provider.get('name', '国内 API 代理')}"
+name = "国内 API 代理"
 base_url = "http://127.0.0.1:{port}/v1"
 wire_api = "responses"
 requires_openai_auth = true
