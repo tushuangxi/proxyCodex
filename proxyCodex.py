@@ -689,10 +689,26 @@ def main():
                         config["active_model"] = m
                         print(f"  >> 模型: {m}")
                     else:
-                        print(f"  >> 未知: {m}")
+                        found = False
+                        for pid, p in config.get("providers", {}).items():
+                            if m in p.get("models", []):
+                                config["active_provider"] = pid
+                                provider_id, provider = get_active_provider(config)
+                                ProxyHandler.model_config = build_model_config(config)
+                                config["active_model"] = m
+                                print(f"  >> 已切到 {p['name']}，模型: {m}")
+                                found = True
+                                break
+                        if not found:
+                            print(f"  >> 未知: {m}")
                 elif cmd == "models":
-                    for mid in ProxyHandler.model_config:
-                        print(f"     {mid}")
+                    all_p = config.get("providers", {})
+                    for pid, p in all_p.items():
+                        mark = " *" if pid == config.get("active_provider") else ""
+                        print(f"  [{pid}]{mark} {p['name']}")
+                        for m in p.get("models", []):
+                            print(f"     {m}")
+                    print("  (* 当前)")
                 elif cmd.startswith("config url "):
                     url = cmd[11:].strip()
                     pid = config["active_provider"]
