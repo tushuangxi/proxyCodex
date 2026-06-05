@@ -658,8 +658,51 @@ def main():
     print(f"  Codex 配置: {CODEX_CONFIG_FILE}")
     print()
     print("  启动 Codex 桌面版，选择\"国内 API 代理\"即可使用")
+    print("  >> 输入 help 查看运行中命令")
     print("  按 Ctrl+C 停止")
     print("=" * 42)
+
+    # 命令监听线程
+    def cmd_listener():
+        import sys
+        while True:
+            try:
+                sys.stdout.write("> ")
+                sys.stdout.flush()
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                cmd = line.strip().lower()
+                if cmd.startswith("switch "):
+                    pid = cmd[7:].strip()
+                    if pid in config.get("providers", {}):
+                        config["active_provider"] = pid
+                        provider_id, provider = get_active_provider(config)
+                        ProxyHandler.model_config = build_model_config(config)
+                        m = config.get("active_model") or provider.get("models", [None])[0]
+                        print(f"  >> 切换到: {provider['name']} ({m})")
+                    else:
+                        print(f"  >> 未知: {pid}")
+                elif cmd.startswith("model "):
+                    m = cmd[6:].strip()
+                    if m in ProxyHandler.model_config:
+                        config["active_model"] = m
+                        print(f"  >> 模型: {m}")
+                    else:
+                        print(f"  >> 未知: {m}")
+                elif cmd == "models":
+                    for mid in ProxyHandler.model_config:
+                        print(f"     {mid}")
+                elif cmd == "help":
+                    print("  switch <id>  - 切换提供商")
+                    print("  model <name> - 切换模型")
+                    print("  models       - 查看可用")
+                elif cmd in ("exit", "quit"):
+                    os._exit(0)
+            except (EOFError, KeyboardInterrupt):
+                break
+
+    threading.Thread(target=cmd_listener, daemon=True).start()
 
     try:
         server.serve_forever()
