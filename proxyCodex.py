@@ -25,14 +25,20 @@ from urllib.parse import urlparse
 # ── 常量 ──────────────────────────────────────────────────
 DEFAULT_PORT = 3000
 
-# PyInstaller 打包后数据文件在 sys._MEIPASS 下
+# 配置文件目录（持久化，exe 运行时也能保存）
+CONFIG_DIR = os.path.expanduser("~/.proxyCodex")
+os.makedirs(CONFIG_DIR, exist_ok=True)
+PROVIDERS_FILE = os.path.join(CONFIG_DIR, "providers.json")
+
+# PyInstaller 打包后默认数据文件在 sys._MEIPASS 下
 _BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-PROVIDERS_FILE = os.path.join(_BASE_DIR, "providers.json")
+_BUILTIN_PROVIDERS = os.path.join(_BASE_DIR, "providers.json")
+
 CODEX_CONFIG_DIR = os.path.expanduser("~/.codex")
 CODEX_CONFIG_FILE = os.path.join(CODEX_CONFIG_DIR, "config.toml")
 CODEX_AUTH_FILE = os.path.join(CODEX_CONFIG_DIR, "auth.json")
 
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 BANNER = f"""
 ╔══════════════════════════════════════════╗
 ║         proxyCodex v{VERSION}              ║
@@ -43,32 +49,55 @@ BANNER = f"""
 
 # ── 提供商配置加载 ────────────────────────────────────────
 def load_providers():
-    """加载 providers.json，如不存在则创建默认配置"""
-    if not os.path.exists(PROVIDERS_FILE):
-        default = {
-            "providers": {
-                "deepseek": {
-                    "name": "DeepSeek",
-                    "base_url": "https://api.deepseek.com/v1",
-                    "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"]
-                },
-                "moonshot": {
-                    "name": "Kimi (Moonshot)",
-                    "base_url": "https://api.moonshot.cn/v1",
-                    "models": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
-                }
+    """加载 providers.json（优先 ~/.proxyCodex/，其次内置默认）"""
+    default = {
+        "providers": {
+            "deepseek": {
+                "name": "DeepSeek",
+                "base_url": "https://api.deepseek.com/v1",
+                "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"]
             },
-            "active_provider": "deepseek",
-            "api_key": ""
-        }
-        with open(PROVIDERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(default, f, ensure_ascii=False, indent=2)
-        print(f"[proxyCodex] 已创建默认配置文件: {PROVIDERS_FILE}")
-        print("[proxyCodex] 请编辑该文件填入你的 API Key，或使用 --setup 交互式配置")
-        return default
+            "moonshot": {
+                "name": "Kimi (Moonshot)",
+                "base_url": "https://api.moonshot.cn/v1",
+                "models": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+            }
+        },
+        "active_provider": "deepseek",
+        "api_key": ""
+    }
 
-    with open(PROVIDERS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    # 1. 优先读取持久化用户配置
+    if os.path.exists(PROVIDERS_FILE):
+        with open(PROVIDERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    # 2. 迁移旧配置（从脚本/项目目录复制）
+    _old_providers = os.path.join(os.path.dirname(os.path.abspath(__file__)), "providers.json")
+    if os.path.exists(_old_providers) and _old_providers != _BUILTIN_PROVIDERS:
+        try:
+            with open(_old_providers, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            save_providers(data)
+            print(f"[proxyCodex] 已迁移配置到: {PROVIDERS_FILE}")
+            return data
+        except Exception:
+            pass
+
+    # 3. 尝试从内置文件复制（exe 打包目录）
+    if os.path.exists(_BUILTIN_PROVIDERS):
+        try:
+            with open(_BUILTIN_PROVIDERS, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            save_providers(data)
+            return data
+        except Exception:
+            pass
+
+    # 4. 创建默认配置
+    save_providers(default)
+    print(f"[proxyCodex] 已创建配置文件: {PROVIDERS_FILE}")
+    return default
 
 
 def save_providers(config):
