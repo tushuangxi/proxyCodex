@@ -715,17 +715,29 @@ def main():
                     if pid in config.get("providers", {}):
                         config["providers"][pid]["custom_base_url"] = url
                         save_providers(config)
-                        # 重新加载模型配置
                         provider_id, provider = get_active_provider(config)
                         ProxyHandler.model_config = build_model_config(config)
-                        print(f"  >> GPT-4o API 地址已设置为: {url}")
+                        print(f"  >> API 地址已设置: {url}")
                     else:
                         print(f"  >> 错误")
+                elif cmd.startswith("config key "):
+                    key = cmd[11:].strip()
+                    config["api_key"] = key
+                    ProxyHandler.api_key = key
+                    save_providers(config)
+                    # 也写入 auth.json
+                    try:
+                        with open(CODEX_AUTH_FILE, 'w', encoding='utf-8') as af:
+                            json.dump({"auth_mode": "apikey", "OPENAI_API_KEY": key}, af)
+                    except:
+                        pass
+                    print(f"  >> API Key 已更新")
                 elif cmd == "help":
                     print("  switch <id>    - 切换提供商")
                     print("  model <name>   - 切换模型")
                     print("  models         - 查看可用模型")
                     print("  config url <s> - 设置中转 API 地址")
+                    print("  config key <k> - 设置 API Key")
                 elif cmd in ("exit", "quit"):
                     os._exit(0)
             except (EOFError, KeyboardInterrupt):
