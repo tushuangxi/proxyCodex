@@ -105,8 +105,8 @@ python proxyCodex.py --help
 
 ```
 > switch moonshot             切换提供商
-> model deepseek-v4-flash     切换模型
-> models                      查看当前可用模型
+> model gpt-4o                 自动切换提供商+模型
+> models                      查看所有提供商的模型
 > config url https://xxx/v1   设置 GPT-4o 中转地址
 > help                        查看所有命令
 > exit                        退出

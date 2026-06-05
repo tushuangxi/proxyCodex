@@ -39,7 +39,7 @@ CODEX_CONFIG_DIR = os.path.expanduser("~/.codex")
 CODEX_CONFIG_FILE = os.path.join(CODEX_CONFIG_DIR, "config.toml")
 CODEX_AUTH_FILE = os.path.join(CODEX_CONFIG_DIR, "auth.json")
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 BANNER = f"""
 ╔══════════════════════════════════════════╗
 ║         proxyCodex v{VERSION}              ║
