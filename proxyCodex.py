@@ -61,6 +61,11 @@ def load_providers():
                 "name": "Kimi (Moonshot)",
                 "base_url": "https://api.moonshot.cn/v1",
                 "models": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+            },
+            "gpt4o": {
+                "name": "GPT-4o 中转",
+                "base_url": "",
+                "models": ["gpt-4o", "gpt-4o-mini", "gpt-4o-2026-05-06", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "o3", "o4-mini"]
             }
         },
         "active_provider": "deepseek",
@@ -70,7 +75,14 @@ def load_providers():
     # 1. 优先读取持久化用户配置
     if os.path.exists(PROVIDERS_FILE):
         with open(PROVIDERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            existing = json.load(f)
+        # 合并缺失的默认提供商（如 gpt4o）
+        for pid, p in default["providers"].items():
+            if pid not in existing.get("providers", {}):
+                existing.setdefault("providers", {})[pid] = p
+                save_providers(existing)
+                print(f"[proxyCodex] 新增提供商: {p['name']}")
+        return existing
 
     # 2. 迁移旧配置（从脚本/项目目录复制）
     _old_providers = os.path.join(os.path.dirname(os.path.abspath(__file__)), "providers.json")
@@ -113,6 +125,10 @@ def get_active_provider(config):
     if not provider:
         print(f"[proxyCodex] 错误: 未找到提供商 '{provider_id}'")
         sys.exit(1)
+    # 如果有自定义 base_url（中转），覆盖默认值
+    if provider.get("custom_base_url"):
+        provider = {**provider, "base_url": provider["custom_base_url"]}
+        config["providers"][provider_id] = provider
     return provider_id, provider
 
 
@@ -177,6 +193,17 @@ def interactive_setup():
     provider_id = provider_ids[idx]
     provider = config["providers"][provider_id]
 
+    # 中转 API 需要额外填写地址
+    if not provider.get("base_url") or provider_id == "gpt4o":
+        print()
+        custom_url = input(f"请输入 {provider['name']} API 地址 (如 https://api.xxx.com/v1): ").strip()
+        while not custom_url:
+            print("API 地址不能为空")
+            custom_url = input(f"请输入 {provider['name']} API 地址: ").strip()
+        # 保存到配置中（临时覆盖默认）
+        provider["custom_base_url"] = custom_url
+        config["providers"][provider_id] = provider
+
     # 输入 API Key
     api_key = input(f"请输入 {provider['name']} API Key: ").strip()
     while not api_key:
@@ -221,7 +248,7 @@ def build_model_config(providers_config):
     config = {}
     pid = providers_config.get("active_provider", "deepseek")
     provider = providers_config.get("providers", {}).get(pid, {})
-    base_url = provider.get("base_url", "https://api.deepseek.com/v1")
+    base_url = provider.get("custom_base_url") or provider.get("base_url", "https://api.deepseek.com/v1")
     provider_name = provider.get("name", "Unknown")
     models = provider.get("models", [])
 
