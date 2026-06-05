@@ -268,6 +268,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if "max_output_tokens" in body:
             chat_payload["max_tokens"] = body["max_output_tokens"]
 
+        # 转发 tools / tool_choice（支持 computer_use 等插件）
+        if "tools" in body:
+            chat_payload["tools"] = body["tools"]
+        if "tool_choice" in body:
+            chat_payload["tool_choice"] = body["tool_choice"]
+
         # 决定响应方式
         stream = body.get("stream", False)
 
@@ -299,6 +305,24 @@ class ProxyHandler(BaseHTTPRequestHandler):
                     role = msg.get("role", "user")
                     if role == "developer":
                         role = "system"
+                    elif role == "assistant":
+                        # 保留 assistant 消息（含可能已有的 tool_calls）
+                        chat_msg = {"role": "assistant"}
+                        content = msg.get("content", "")
+                        if isinstance(content, list):
+                            texts = []
+                            for part in content:
+                                if isinstance(part, dict) and part.get("type") in ("text", "input_text"):
+                                    texts.append(part.get("text", ""))
+                            content = "\n".join(texts)
+                        if content:
+                            chat_msg["content"] = content
+                        # 检查是否已有 tool_calls（多轮对话中复用）
+                        if msg.get("tool_calls"):
+                            chat_msg["tool_calls"] = msg["tool_calls"]
+                        messages.append(chat_msg)
+                        continue
+
                     content = msg.get("content", "")
                     if isinstance(content, list):
                         texts = []
@@ -306,7 +330,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
                             if isinstance(part, dict) and part.get("type") in ("text", "input_text"):
                                 texts.append(part.get("text", ""))
                         content = "\n".join(texts)
-                    if content:
+
+                    if role == "tool":
+                        # tool 结果消息
+                        tool_msg = {"role": "tool", "content": content}
+                        if msg.get("tool_call_id"):
+                            tool_msg["tool_call_id"] = msg["tool_call_id"]
+                        messages.append(tool_msg)
+                    elif content:
                         messages.append({"role": role, "content": content})
                 elif isinstance(msg, str):
                     messages.append({"role": "user", "content": msg})
@@ -341,33 +372,50 @@ class ProxyHandler(BaseHTTPRequestHandler):
         else:
             self._handle_non_streaming(resp, model)
 
-    # ── 非流式响应 ──
+    # ── 非流式响应（含 tool_calls 支持）──
     def _handle_non_streaming(self, resp, model):
         chat_resp = json.loads(resp.read())
         choice = chat_resp.get("choices", [{}])[0]
         msg = choice.get("message", {})
         content = msg.get("content", "")
 
+        output = []
+        # 文本输出
+        if content:
+            output.append({
+                "type": "message",
+                "role": msg.get("role", "assistant"),
+                "content": [{"type": "output_text", "text": content}],
+            })
+        # tool_calls 输出
+        tool_calls = msg.get("tool_calls", [])
+        for tc in tool_calls:
+            func = tc.get("function", {})
+            output.append({
+                "type": "function_call",
+                "id": tc.get("id", f"call_{os.urandom(8).hex()}"),
+                "name": func.get("name", ""),
+                "arguments": func.get("arguments", "{}"),
+                "status": "completed",
+            })
+
         responses_resp = {
             "id": f"resp_{chat_resp.get('id', 'unknown')}",
             "object": "response",
             "model": model,
             "status": "completed",
-            "output": [{
-                "type": "message",
-                "role": msg.get("role", "assistant"),
-                "content": [{"type": "output_text", "text": content}],
-            }],
+            "output": output,
             "usage": chat_resp.get("usage", {}),
         }
         self._send_json(json.dumps(responses_resp).encode("utf-8"))
 
-    # ── 流式响应（SSE） ──
+    # ── 流式响应（SSE，含 tool_calls）──
     def _handle_streaming(self, resp, model):
         chat_resp = json.loads(resp.read())
         choice = chat_resp.get("choices", [{}])[0]
         msg = choice.get("message", {})
         content = msg.get("content", "")
+        tool_calls = msg.get("tool_calls", [])
 
         # SSE 响应头
         self.send_response(200)
@@ -388,24 +436,56 @@ class ProxyHandler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
-        # 初始化事件
+        # 构造所有 output items
+        output_items = []
+        if content:
+            output_items.append({
+                "id": item_id, "type": "message",
+                "role": role, "status": "completed",
+                "content": [{"type": "output_text", "text": content}],
+            })
+        for tc in tool_calls:
+            func = tc.get("function", {})
+            call_id = tc.get("id", f"call_{os.urandom(8).hex()}")
+            output_items.append({
+                "id": call_id, "type": "function_call",
+                "name": func.get("name", ""),
+                "arguments": func.get("arguments", "{}"),
+                "status": "completed",
+            })
+
+        if not output_items:
+            output_items.append({
+                "id": item_id, "type": "message",
+                "role": role, "status": "completed",
+                "content": [{"type": "output_text", "text": ""}],
+            })
+
+        # 发送初始化 + 文本 delta
         sse("response.created", {"type":"response.created","id":response_id,"object":"response","created":created,"model":model})
         sse("response.in_progress", {"type":"response.in_progress","id":response_id,"object":"response","created":created,"model":model,"status":"in_progress"})
-        sse("response.output_item.added", {"type":"response.output_item.added","id":response_id,"object":"response","output_index":0,"item":{"id":item_id,"type":"message","role":role,"status":"in_progress"}})
-        sse("response.content_part.added", {"type":"response.content_part.added","id":response_id,"object":"response","output_index":0,"content_index":0,"part":{"type":"text"}})
 
-        # Delta
+        out_idx = 0
         if content:
-            sse("response.output_text.delta", {"type":"response.output_text.delta","id":response_id,"object":"response","output_index":0,"content_index":0,"delta":content})
+            sse("response.output_item.added", {"type":"response.output_item.added","id":response_id,"object":"response","output_index":0,"item":{"id":item_id,"type":"message","role":role,"status":"in_progress"}})
+            sse("response.content_part.added", {"type":"response.content_part.added","id":response_id,"object":"response","output_index":0,"content_index":0,"part":{"type":"text"}})
+            if content:
+                sse("response.output_text.delta", {"type":"response.output_text.delta","id":response_id,"object":"response","output_index":0,"content_index":0,"delta":content})
+            sse("response.output_text.done", {"type":"response.output_text.done","id":response_id,"object":"response","output_index":0,"content_index":0,"text":content})
+            sse("response.output_item.done", {"type":"response.output_item.done","id":response_id,"object":"response","output_index":0,"item":output_items[0]})
+            out_idx = 1
 
-        # 完成事件
-        sse("response.output_text.done", {"type":"response.output_text.done","id":response_id,"object":"response","output_index":0,"content_index":0,"text":content})
-        sse("response.output_item.done", {"type":"response.output_item.done","id":response_id,"object":"response","output_index":0,"item":{"id":item_id,"type":"message","role":role,"status":"completed","content":[{"type":"output_text","text":content}]}})
+        # tool_calls 事件
+        for i, tc in enumerate(tool_calls):
+            func = tc.get("function", {})
+            call_id = tc.get("id", f"call_{os.urandom(8).hex()}")
+            idx = out_idx + i
+            sse("response.output_item.added", {"type":"response.output_item.added","id":response_id,"object":"response","output_index":idx,"item":{"id":call_id,"type":"function_call","name":func.get("name",""),"status":"in_progress"}})
+            sse("response.output_item.done", {"type":"response.output_item.done","id":response_id,"object":"response","output_index":idx,"item":output_items[out_idx + i]})
 
         usage = chat_resp.get("usage", {})
-        sse("response.response.done", {"type":"response.response.done","id":response_id,"object":"response","created":created,"model":model,"status":"completed","output":[{"id":item_id,"type":"message","role":role,"status":"completed","content":[{"type":"output_text","text":content}]}],"usage":usage})
+        sse("response.response.done", {"type":"response.response.done","id":response_id,"object":"response","created":created,"model":model,"status":"completed","output":output_items,"usage":usage})
 
-        # 关闭连接
         self.close_connection = True
 
     # ── 辅助 ──
